@@ -2,3 +2,4 @@ sqlalchemy>=2.0
 psycopg[binary]
 pydantic-settings
 pgvector
+firebase-admin==7.8.0
