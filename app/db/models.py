@@ -80,6 +80,7 @@ class User(Base):
 
     chunks: Mapped[list["DocumentChunk"]] = relationship(
         back_populates="user",
+        viewonly=True,
     )
 
 
@@ -236,6 +237,7 @@ class DocumentChunk(Base):
 
     user: Mapped["User"] = relationship(
         back_populates="chunks",
+        viewonly=True,
     )
 
     document: Mapped["Document"] = relationship(
