@@ -8,10 +8,8 @@ from app.core.firebase import initialize_firebase
 
 def verify_firebase_id_token(id_token: str) -> dict[str, Any]:
     """
-    Verify a Firebase ID token and return its decoded claims.
-
-    Raises Firebase Admin SDK authentication exceptions
-    if the token is invalid, expired, or otherwise unverifiable.
+    Verify Firebase ID token, including revocation
+    and disabled-account checks.
     """
 
     if not id_token or not id_token.strip():
@@ -22,6 +20,7 @@ def verify_firebase_id_token(id_token: str) -> dict[str, Any]:
     decoded_token = auth.verify_id_token(
         id_token,
         app=firebase_app,
+        check_revoked=True,
     )
 
     return decoded_token
