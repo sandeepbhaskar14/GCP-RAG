@@ -51,16 +51,16 @@ def get_current_firebase_user(
         return decoded_token
 
     except (
-        auth.InvalidIdTokenError,
-        auth.ExpiredIdTokenError,
-        auth.RevokedIdTokenError,
+    auth.InvalidIdTokenError,
+    auth.ExpiredIdTokenError,
+    auth.RevokedIdTokenError,
+    auth.UserDisabledError,
     ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired Firebase ID token.",
+            detail="Invalid, expired, revoked, or disabled account.",
             headers={"WWW-Authenticate": "Bearer"},
         )
-
     except exceptions.FirebaseError:
         logger.exception("Firebase token verification service failed")
 
@@ -68,3 +68,27 @@ def get_current_firebase_user(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Authentication service temporarily unavailable.",
         )
+    except ValueError:
+        logger.warning("Invalid authentication token received")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
+def require_verified_email(
+    firebase_user: dict = Depends(get_current_firebase_user),
+) -> dict:
+    """
+    Require the authenticated Firebase account
+    to have a verified email address.
+    """
+
+    if not firebase_user.get("email_verified", False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Please verify your email address before using this feature.",
+        )
+
+    return firebase_user
