@@ -39,6 +39,7 @@ def create_signed_upload_url(
         ),
         method="PUT",
         content_type=content_type,
+        headers={"x-goog-if-generation-match": "0"},
         service_account_email=service_account_email,
         access_token=credentials.token,
     )
