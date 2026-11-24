@@ -1,4 +1,3 @@
-import re
 import uuid
 from pathlib import PurePath
 
@@ -165,16 +164,16 @@ def confirm_document_upload(
             status=document.status,
         )
 
+    from google.api_core.exceptions import NotFound
+
     try:
         actual_size, actual_type = get_blob_metadata(document.storage_path)
-    except Exception as exc:
-        from google.api_core.exceptions import NotFound
-
-        if isinstance(exc, NotFound):
-            raise HTTPException(
-                status_code=409,
-                detail="Uploaded object was not found in storage.",
-            )
+    except NotFound:
+        raise HTTPException(
+            status_code=409,
+            detail="Uploaded object was not found in storage.",
+        )
+    except Exception:
         raise HTTPException(
             status_code=503,
             detail="Could not verify the uploaded object.",
