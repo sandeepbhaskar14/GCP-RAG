@@ -51,6 +51,16 @@ def get_blob_metadata(storage_path: str) -> tuple[int, str | None]:
     return int(blob.size or 0), blob.content_type
 
 
+def download_blob(storage_path: str) -> bytes:
+    """Download a confirmed object after checking its size metadata."""
+    blob = _bucket().blob(storage_path)
+    blob.reload()
+    size = int(blob.size or 0)
+    if size <= 0 or size > settings.MAX_DOCUMENT_SIZE_BYTES:
+        raise ValueError("Stored object has an invalid size.")
+    return blob.download_as_bytes(checksum="auto", raw_download=True)
+
+
 def delete_blob(storage_path: str) -> None:
     """Delete an object; a missing object is already in the desired state."""
     try:
