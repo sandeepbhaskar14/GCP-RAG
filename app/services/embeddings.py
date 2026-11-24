@@ -13,7 +13,7 @@ def embed_documents(texts: list[str]) -> list[list[float]]:
         raise RuntimeError("GOOGLE_CLOUD_PROJECT must be configured.")
 
     client = genai.Client(
-        vertexai=True,
+        enterprise=True,
         project=settings.GOOGLE_CLOUD_PROJECT,
         location=settings.GOOGLE_CLOUD_LOCATION,
     )
