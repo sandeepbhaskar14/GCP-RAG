@@ -1,18 +1,17 @@
 from fastapi import FastAPI
 
-from app.api.routes import auth, documents
+from app.api.routes import auth, documents, internal
 
 
 app = FastAPI(
     title="GCP RAG API",
-    description="Authentication and Retrieval-Augmented Generation API",
-    version="1.0.0",
+    description="Authentication, document management, and RAG ingestion API",
+    version="1.1.0",
 )
 
-
-# Register API routers
 app.include_router(auth.router)
 app.include_router(documents.router)
+app.include_router(internal.router)
 
 
 @app.get("/health", tags=["Health"])

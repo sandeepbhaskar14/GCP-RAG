@@ -6,6 +6,7 @@ from google.cloud import storage
 from google.api_core.exceptions import NotFound
 
 from app.core.config import settings
+from app.services.extraction import InvalidDocumentError
 
 
 def _bucket():
@@ -49,6 +50,20 @@ def get_blob_metadata(storage_path: str) -> tuple[int, str | None]:
     blob = _bucket().blob(storage_path)
     blob.reload()
     return int(blob.size or 0), blob.content_type
+
+
+def download_blob(storage_path: str) -> bytes:
+    """Download a confirmed object after checking its size metadata."""
+    blob = _bucket().blob(storage_path)
+    try:
+        blob.reload()
+    except NotFound as exc:
+        raise InvalidDocumentError("Uploaded object no longer exists in storage.") from exc
+
+    size = int(blob.size or 0)
+    if size <= 0 or size > settings.MAX_DOCUMENT_SIZE_BYTES:
+        raise InvalidDocumentError("Stored object has an invalid size.")
+    return blob.download_as_bytes(checksum="auto", raw_download=True)
 
 
 def delete_blob(storage_path: str) -> None:

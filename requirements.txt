@@ -7,3 +7,7 @@ pytest
 httpx
 google-cloud-storage
 google-auth
+google-cloud-tasks
+google-genai
+pymupdf
+python-docx
