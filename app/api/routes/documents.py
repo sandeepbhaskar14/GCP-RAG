@@ -140,7 +140,10 @@ def create_document_upload_url(
         upload_url=upload_url,
         storage_path=storage_path,
         expires_in_seconds=settings.UPLOAD_URL_EXPIRES_MINUTES * 60,
-        required_headers={"Content-Type": payload.content_type},
+        required_headers={
+            "Content-Type": payload.content_type,
+            "x-goog-if-generation-match": "0",
+        },
     )
 
 
