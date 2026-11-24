@@ -21,6 +21,7 @@ from app.services.storage import (
     delete_blob,
     get_blob_metadata,
 )
+from app.services.tasks import enqueue_document_ingestion
 
 
 router = APIRouter(
@@ -55,17 +56,13 @@ def _current_user(firebase_user: dict, db: Session):
 
 
 def _safe_filename(value: str) -> str:
-    # Discard path components and reject control characters.
-    name = PurePath(value.replace("\\", "/")).name.strip()
+    name = PurePath(value.replace("\\\\", "/")).name.strip()
     if (
         not name
         or name in {".", ".."}
         or any(ord(char) < 32 or ord(char) == 127 for char in name)
     ):
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid file name.",
-        )
+        raise HTTPException(status_code=400, detail="Invalid file name.")
     return name
 
 
@@ -83,6 +80,20 @@ def _owned_document(
     if document is None:
         raise HTTPException(status_code=404, detail="Document not found.")
     return document
+
+
+def _enqueue_if_enabled(document: Document) -> None:
+    if not settings.CLOUD_TASKS_ENABLED:
+        return
+    try:
+        enqueue_document_ingestion(str(document.id))
+    except Exception as exc:
+        # The upload is already confirmed. A retry of this endpoint can enqueue
+        # the deterministic task without uploading the file again.
+        raise HTTPException(
+            status_code=503,
+            detail="Upload confirmed, but ingestion could not be scheduled. Retry confirmation.",
+        ) from exc
 
 
 @router.post(
@@ -106,9 +117,7 @@ def create_document_upload_url(
         )
 
     document_id = uuid.uuid4()
-    storage_path = (
-        f"users/{user.id}/documents/{document_id}/{file_name}"
-    )
+    storage_path = f"users/{user.id}/documents/{document_id}/{file_name}"
     document = Document(
         id=document_id,
         user_id=user.id,
@@ -127,13 +136,13 @@ def create_document_upload_url(
             storage_path=storage_path,
             content_type=payload.content_type,
         )
-    except Exception:
+    except Exception as exc:
         db.delete(document)
         db.commit()
         raise HTTPException(
             status_code=503,
             detail="Could not create an upload URL. Please try again.",
-        )
+        ) from exc
 
     return UploadUrlResponse(
         document_id=document.id,
@@ -159,9 +168,8 @@ def confirm_document_upload(
     user = _current_user(firebase_user, db)
     document = _owned_document(db, document_id, user.id)
 
-    # A confirmed upload has a persisted positive object size. This makes
-    # repeated confirmation requests safe and avoids duplicate processing.
     if document.file_size is not None:
+        _enqueue_if_enabled(document)
         return DocumentStatusResponse(
             document_id=document.id,
             status=document.status,
@@ -176,11 +184,11 @@ def confirm_document_upload(
             status_code=409,
             detail="Uploaded object was not found in storage.",
         )
-    except Exception:
+    except Exception as exc:
         raise HTTPException(
             status_code=503,
             detail="Could not verify the uploaded object.",
-        )
+        ) from exc
 
     if actual_size <= 0 or actual_size > settings.MAX_DOCUMENT_SIZE_BYTES:
         try:
@@ -201,6 +209,8 @@ def confirm_document_upload(
     document.file_size = actual_size
     db.commit()
     db.refresh(document)
+
+    _enqueue_if_enabled(document)
 
     return DocumentStatusResponse(
         document_id=document.id,
@@ -263,11 +273,11 @@ def remove_document(
 
     try:
         delete_blob(document.storage_path)
-    except Exception:
+    except Exception as exc:
         raise HTTPException(
             status_code=503,
             detail="Could not delete the document from storage.",
-        )
+        ) from exc
 
     db.delete(document)
     db.commit()
